@@ -36,7 +36,7 @@ class SiameseBiLSTM:
                 1. Pass the each from sentences_pairs  to bidirectional LSTM encoder.
                 2. Merge the vectors from LSTM encodes and passed to dense layer.
                 3. Pass the  dense layer vectors to sigmoid output layer.
-                4. Use cross entropy loss to train weights
+                4. Use categorical cross entropy loss to train weights
         Args:
             sentences_pair (list): list of tuple of sentence pairs
             is_similar (list): target value 1 if same sentences pair are similar otherwise 0
@@ -46,12 +46,17 @@ class SiameseBiLSTM:
         Returns:
             return (best_model_path):  path of best model
         """
+
+
         tokenizer, embedding_matrix = embedding_meta_data['tokenizer'], embedding_meta_data['embedding_matrix']
 
         train_data_x1, train_data_x2, train_labels, leaks_train, \
         val_data_x1, val_data_x2, val_labels, leaks_val = create_train_dev_set(tokenizer, sentences_pair,
                                                                                is_similar, self.max_sequence_length,
                                                                                self.validation_split_ratio)
+
+        train_labels_list = train_labels.tolist()
+        num_classes = len(set(train_labels_list))
 
         if train_data_x1 is None:
             print("++++ !! Failure: Unable to train model ++++")
@@ -88,10 +93,10 @@ class SiameseBiLSTM:
         merged = Dense(self.number_dense_units, activation=self.activation_function)(merged)
         merged = BatchNormalization()(merged)
         merged = Dropout(self.rate_drop_dense)(merged)
-        preds = Dense(1, activation='sigmoid')(merged)
+        preds = Dense(num_classes, activation='softmax')(merged)
 
         model = Model(inputs=[sequence_1_input, sequence_2_input, leaks_input], outputs=preds)
-        model.compile(loss='binary_crossentropy', optimizer='nadam', metrics=['acc'])
+        model.compile(loss='categorical_crossentropy', optimizer='nadam', metrics=['acc'])
 
         early_stopping = EarlyStopping(monitor='val_loss', patience=3)
 
